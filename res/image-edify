@@ -1,0 +1,4 @@
+assert(restore_rom("/tmp/image"));
+assert(format("/system"));
+assert(mount("/system"));
+

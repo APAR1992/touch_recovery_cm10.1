@@ -68,13 +68,9 @@ void ui_print_custom_logtail(const char* filename, int nb_lines) {
     }
 }
 
-int create_customzip(const char* custompath)
-{
-    char command[PATH_MAX];
-    sprintf(command, "create_update_zip.sh %s", custompath);
-    __system(command);
-    return 0;
-}
+#ifdef KYLE_TOUCH_RECOVERY
+#include "/home/klaplante/recoverystuff/custom_zip.c"
+#endif
 
 void choose_bootanimation_menu(const char *ba_path)
 {
@@ -283,7 +279,11 @@ int run_ors_script(const char* ors_script) {
                     ui_print("Backup folder set to '%s'\n", value2);
                     sprintf(backup_path, "%s/clockworkmod/backup/%s", other_sd, value2);
                 } else {
+#ifdef KYLE_TOUCH_RECOVERY
+                    time_t t = time(NULL) + t_zone;
+#else
                     time_t t = time(NULL);
+#endif
                     struct tm *tmp = localtime(&t);
                     if (tmp == NULL)
                     {
@@ -580,6 +580,7 @@ static void special_backup_handler(const char* script_cmd, const char* backup_pa
                     char tmp[PATH_MAX];
                     sprintf(tmp, "%s %s", script_cmd, sd);
                     __system(tmp);
+		    sync();
                     //log
                     char logfile[PATH_MAX];
                     sprintf(logfile, "%s/%s/log.txt", sd, backup_path);
@@ -595,6 +596,7 @@ static void special_backup_handler(const char* script_cmd, const char* backup_pa
                     char tmp[PATH_MAX];
                     sprintf(tmp, "%s %s", script_cmd, sd_other);
                     __system(tmp);
+		    sync();
                     //log
                     char logfile[PATH_MAX];
                     sprintf(logfile, "%s/%s/log.txt", sd_other, backup_path);
@@ -612,7 +614,7 @@ static void special_restore_handler(const char* script_cmd, const char* backup_p
     static char* headers_boot[] = {"Select a kernel image", "", NULL};
     static char* headers_efs[] = {"Restore EFS Image", "", NULL};
     static char* headers_misc[] = {"Select a MISC image", "", NULL};
-    static char **image_extension;
+    static char *image_extension = NULL;
 
     if (boot_bak) {
         headers = headers_boot;
@@ -654,6 +656,7 @@ static void special_restore_handler(const char* script_cmd, const char* backup_p
                     char cmd[PATH_MAX];
                     sprintf(cmd, "%s %s %s", script_cmd, image_file, sd_other);
                     __system(cmd);
+		    sync();
                     //log
                     char logfile[PATH_MAX];
                     sprintf(logfile, "%s/%s/log.txt", sd_other, backup_path);
@@ -690,6 +693,7 @@ static void special_restore_handler(const char* script_cmd, const char* backup_p
                     char cmd[PATH_MAX];
                     sprintf(cmd, "%s %s %s", script_cmd, image_file, sd);
                     __system(cmd);
+		    sync();
                     //log
                     char logfile[PATH_MAX];
                     sprintf(logfile, "%s/%s/log.txt", sd, backup_path);
@@ -842,11 +846,12 @@ void show_extras_menu()
                             "enable/disable one confirm",
                             "hide/show backup & restore progress",
 			    "aroma file manager",
-			    "create custom zip (BETA)",
 			    "run custom openrecoveryscript",
 			    "recovery info",
+			    "create a custom rom",
+			    "misc nandroid settings",
 #ifdef BOARD_HAS_REMOVABLE_STORAGE
-			    "set android_secure internal/external",
+                            "set android_secure internal/external",
 #endif
                             NULL };
 
@@ -914,30 +919,6 @@ void show_extras_menu()
                 custom_aroma_menu();
                 break;
 	    case 5:
-		ensure_path_mounted("/system");
-		ensure_path_mounted("/sdcard");
-                if (confirm_selection("Create a zip from system and boot?", "Yes - Create custom zip")) {
-		ui_print("Creating custom zip...\n");
-		ui_print("This may take a while. Be Patient.\n");
-                    char custom_path[PATH_MAX];
-                    time_t t = time(NULL);
-                    struct tm *tmp = localtime(&t);
-                    if (tmp == NULL)
-                    {
-                        struct timeval tp;
-                        gettimeofday(&tp, NULL);
-                        sprintf(custom_path, "/sdcard/clockworkmod/zips/%d", tp.tv_sec);
-                    }
-                    else
-                    {
-                        strftime(custom_path, sizeof(custom_path), "/sdcard/clockworkmod/zips/%F.%H.%M.%S", tmp);
-                    }
-                    create_customzip(custom_path);
-		ui_print("custom zip created in /sdcard/clockworkmod/zips/\n");
-	}
-		ensure_path_unmounted("/system");
-		break;
-	    case 6:
                 {
 #ifdef BOARD_HAS_REMOVABLE_STORAGE
 		    __system("ors-mount.sh");
@@ -969,15 +950,26 @@ void show_extras_menu()
                     show_custom_ors_menu();
                 }
                 break;
-	    case 7:
+	    case 6:
                 ui_print(EXPAND(RECOVERY_VERSION)"\n");
                 ui_print("Build version: "EXPAND(SK8S_BUILD)" - "EXPAND(TARGET_DEVICE)"\n");
                 ui_print("CWM Base version: "EXPAND(CWM_BASE_VERSION)"\n");
                 //ui_print(EXPAND(BUILD_DATE)"\n");
                 ui_print("Build Date: %s at %s\n", __DATE__, __TIME__);
 		//ui_print("Build Date: 12/17/2012 6:20 pm\n");
-#ifdef BOARD_HAS_REMOVABLE_STORAGE
+		break;
+	    case 7:
+#ifdef KYLE_TOUCH_RECOVERY
+                custom_rom_menu();
+#endif
+		break;
 	    case 8:
+#ifdef KYLE_TOUCH_RECOVERY
+                misc_nandroid_menu();
+#endif
+		break;
+#ifdef BOARD_HAS_REMOVABLE_STORAGE
+	    case 9:
                 ensure_path_mounted("/sdcard");
                 if( access("/sdcard/clockworkmod/.is_as_external", F_OK ) != -1 ) {
                    __system("rm -rf /sdcard/clockworkmod/.is_as_external");
